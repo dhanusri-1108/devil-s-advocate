@@ -1,144 +1,99 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', Arial, sans-serif;
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devil's Advocate Bot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>😈 Devil's Advocate Bot</h1>
+            <p>Give an opinion. I'll argue the opposite. Always.</p>
+            <button id="resetBtn">Reset Chat</button>
+        </header>
 
-body {
-    background: linear-gradient(135deg, #1e1e2f, #2d1b1b);
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
+        <div id="chatBox" class="chat-box">
+            <div class="message bot-message">
+                Say something you believe in — I dare you. I'll argue the other side. 😈
+            </div>
+        </div>
 
-.container {
-    background: #ffffff;
-    width: 100%;
-    max-width: 600px;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    height: 85vh;
-}
+        <div id="loading" class="loading" style="display: none;">
+            Devil's Advocate is thinking...
+        </div>
 
-header {
-    background: #b91c1c;
-    color: white;
-    padding: 20px;
-    text-align: center;
-    position: relative;
-}
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Type your opinion here..." autocomplete="off">
+            <button id="sendBtn">Send</button>
+        </div>
+    </div>
 
-header h1 {
-    font-size: 24px;
-    margin-bottom: 5px;
-}
+    <script>
+        const chatBox = document.getElementById("chatBox");
+        const userInput = document.getElementById("userInput");
+        const sendBtn = document.getElementById("sendBtn");
+        const resetBtn = document.getElementById("resetBtn");
+        const loading = document.getElementById("loading");
 
-header p {
-    font-size: 13px;
-    opacity: 0.9;
-}
+        // Simple session id so multiple browser tabs don't mix history
+        const sessionId = "session_" + Math.random().toString(36).substring(2);
 
-#resetBtn {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 12px;
-}
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement("div");
+            msgDiv.className = "message " + (sender === "user" ? "user-message" : "bot-message");
+            msgDiv.textContent = text;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
 
-#resetBtn:hover {
-    background: rgba(255, 255, 255, 0.35);
-}
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
 
-.chat-box {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    background: #f9f9fb;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
+            addMessage(message, "user");
+            userInput.value = "";
+            sendBtn.disabled = true;
+            loading.style.display = "block";
 
-.message {
-    max-width: 80%;
-    padding: 12px 16px;
-    border-radius: 16px;
-    font-size: 14px;
-    line-height: 1.5;
-    word-wrap: break-word;
-}
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: message, session_id: sessionId })
+                });
 
-.bot-message {
-    background: #2d2d3a;
-    color: #fff;
-    align-self: flex-start;
-    border-bottom-left-radius: 4px;
-}
+                const data = await response.json();
 
-.user-message {
-    background: #b91c1c;
-    color: white;
-    align-self: flex-end;
-    border-bottom-right-radius: 4px;
-}
+                if (data.error) {
+                    addMessage("⚠️ Error: " + data.error, "bot");
+                } else {
+                    addMessage(data.reply, "bot");
+                }
+            } catch (err) {
+                addMessage("⚠️ Network error. Is the Flask server running?", "bot");
+                console.error(err);
+            } finally {
+                loading.style.display = "none";
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
 
-.loading {
-    text-align: center;
-    font-size: 13px;
-    color: #888;
-    padding: 5px;
-    font-style: italic;
-}
+        sendBtn.addEventListener("click", sendMessage);
+        userInput.addEventListener("keypress", function (e) {
+            if (e.key === "Enter") sendMessage();
+        });
 
-.input-area {
-    display: flex;
-    padding: 15px;
-    background: #fff;
-    border-top: 1px solid #eee;
-    gap: 10px;
-}
-
-#userInput {
-    flex: 1;
-    padding: 12px 15px;
-    border: 1px solid #ddd;
-    border-radius: 25px;
-    outline: none;
-    font-size: 14px;
-}
-
-#userInput:focus {
-    border-color: #b91c1c;
-}
-
-#sendBtn {
-    background: #b91c1c;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 25px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 14px;
-}
-
-#sendBtn:hover {
-    background: #991414;
-}
-
-#sendBtn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-}
+        resetBtn.addEventListener("click", async function () {
+            await fetch("/reset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+            chatBox.innerHTML = '<div class="message bot-message">Chat reset. Say something you believe in — I dare you. 😈</div>';
+        });
+    </script>
+</body>
+</html>
